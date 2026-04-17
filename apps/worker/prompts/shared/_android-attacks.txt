@@ -1,0 +1,51 @@
+### Android-Specific Attack Techniques
+
+#### Tapjacking / Overlay Attacks (MASTG-TEST-0035)
+**Detection**: Check for missing `setFilterTouchesWhenObscured(true)` or `android:filterTouchesWhenObscured="true"` on sensitive UI elements (login, payment, permission dialogs).
+**Exploitation**: Create a transparent overlay over the target activity. User thinks they're tapping the legitimate UI, but actually interacting with the overlay. Test with:
+```bash
+# Check if target activity blocks overlays
+adb shell am start -n {{PACKAGE_NAME}}/.LoginActivity
+# Then launch an overlay app and verify tap-through
+```
+**Note**: Android 12+ blocks most overlays via TYPE_APPLICATION_OVERLAY restrictions, but apps targeting lower API levels remain vulnerable.
+
+#### Task Hijacking / StrandHogg (MASTG-TEST-0036)
+**Detection**: Check AndroidManifest.xml for:
+- Missing `android:taskAffinity=""` (empty string prevents hijacking)
+- `android:launchMode` not set to `singleInstance` or `singleTask`
+- Activities without explicit taskAffinity inherit the package name
+**Exploitation**: A malicious app with matching taskAffinity can place itself in front of the legitimate app's task stack, stealing credentials.
+
+#### Broadcast Theft
+**Detection**: Scan for `sendBroadcast()` without explicit permissions or component targeting.
+**Exploitation**: Register a receiver matching the target's implicit broadcast. Capture sensitive data from broadcast extras:
+```bash
+# Monitor broadcasts
+adb shell am monitor
+```
+
+#### PendingIntent Hijacking
+**Detection**: Scan for `PendingIntent.get*()` calls using `FLAG_MUTABLE` without explicit component.
+**Exploitation**: Intercept the mutable PendingIntent, modify its extras or target, then execute it.
+**Note**: Android 12+ requires FLAG_MUTABLE or FLAG_IMMUTABLE. Flag apps that use FLAG_MUTABLE for sensitive operations.
+
+#### Implicit Intent Hijacking
+**Detection**: Scan for `startActivity(intent)` or `startActivityForResult(intent)` where the Intent has no explicit component set.
+**Exploitation**: Register an activity matching the implicit intent filter to intercept the data.
+
+#### ZIP Path Traversal
+**Detection**: If app extracts ZIP files, check for `java.util.zip.ZipEntry.getName()` used without `../` validation.
+**Exploitation**: Craft a malicious ZIP with entries containing `../../../data/data/{{PACKAGE_NAME}}/shared_prefs/evil.xml` to overwrite app files.
+**Note**: Android 14+ (API 34) automatically prevents this. Flag if app targets lower API levels.
+
+#### Insecure Backup Extraction
+**Detection**: Check `android:allowBackup="true"` in manifest (default is true if not specified).
+**Exploitation**:
+```bash
+adb backup -f backup.ab {{PACKAGE_NAME}}
+# Use Android Backup Extractor to unpack
+java -jar abe.jar unpack backup.ab backup.tar
+tar xf backup.tar
+# Inspect extracted data for secrets
+```

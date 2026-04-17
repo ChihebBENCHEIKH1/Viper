@@ -1,0 +1,118 @@
+## Vulnerability Scope for Android Applications
+
+### In-Scope: Exploitable from Device or Network
+A vulnerability is in-scope if it can be triggered by:
+- A user interacting with the installed app
+- Another app on the same device (exported components, IPC)
+- A network attacker (MITM, API manipulation)
+- Physical access to the device (backup extraction, file access)
+- A malicious deep link or intent
+
+### Out-of-Scope: Not Real Vulnerabilities
+- APK decompilation itself (all APKs are decompilable — this is expected)
+- String resources visible in APK (this is normal Android behavior)
+- Obfuscated code being readable after decompilation (expected)
+- Debug builds having debug flags (only test release builds)
+- Test/mock credentials in test directories
+- Development-only configurations not present in release
+
+### NOT Vulnerabilities (Do NOT Report)
+- APK can be decompiled → ALL APKs can be. Not a finding.
+- App uses HTTP for non-sensitive requests → Check what data is transmitted first.
+- ProGuard/R8 obfuscation can be reversed → Expected. Only report if sensitive logic exposed.
+- App requests many permissions → Only report if permissions are UNUSED or EXCESSIVE.
+- SSL pinning is absent → Only a finding if sensitive data is transmitted over the connection.
+- App stores data in SharedPreferences → Only a finding if the data is SENSITIVE and UNENCRYPTED.
+- Root detection is absent → Only a finding for apps handling financial/health/auth data.
+- Certificate transparency logs exist → This is normal. Not a vulnerability.
+
+### Common Mobile False Positives to Avoid
+- Generic "insecure storage" without specifying WHAT data is at risk
+- "Missing root detection" for apps that don't handle sensitive data
+- "WebView vulnerability" when loadUrl only loads trusted first-party URLs
+- "Exported component" when the component has proper permission guards
+- "Hardcoded string" that is actually a public API base URL (not a secret)
+
+### OWASP Mobile Top 10 2024 Categories
+M1: Improper Credential Usage — hardcoded creds, weak credential storage
+M2: Inadequate Supply Chain Security — vulnerable 3rd-party libs
+M3: Insecure Authentication/Authorization — weak auth, broken authz
+M4: Insufficient Input/Output Validation — injection, XSS in WebViews
+M5: Insecure Communication — cleartext, missing pinning, weak TLS
+M6: Inadequate Privacy Controls — excessive collection, PII leaks
+M7: Insufficient Binary Protections — no obfuscation, debug symbols
+M8: Security Misconfiguration — exported components, debug mode
+M9: Insecure Data Storage — plaintext secrets, world-readable files
+M10: Insufficient Cryptography — weak algorithms, hardcoded keys
+
+### Evidence Requirement
+Every finding MUST have:
+1. Code location (file:line) showing the vulnerable pattern
+2. Runtime proof (Frida hook output, ADB file pull, or mitmproxy capture)
+3. Exact reproduction steps an analyst can follow
+4. Impact statement explaining what an attacker gains
+
+---
+
+## Confidence Scoring Definitions
+
+Assign a confidence level to EVERY finding:
+
+- **HIGH:** The flaw is directly established and deterministic. You have direct
+  evidence (code that creates the condition AND runtime confirmation) with no
+  material alternate control. The source→sink path is clear, the slot type is
+  identified, and sanitization is either absent or demonstrably mismatched.
+  Example: plaintext auth token in SharedPreferences confirmed via `adb pull`.
+
+- **MEDIUM:** The flaw is strongly indicated but there is at least one material
+  uncertainty. Signals are mostly consistent but a reasonable alternative remains.
+  Examples: sanitization exists but you cannot fully trace its effectiveness; the
+  vulnerable code path exists but runtime behavior is conditional; configuration
+  suggests vulnerability but you couldn't trigger it dynamically.
+
+- **LOW:** The flaw is plausible but unverified or weakly supported. Indirect or
+  single-sourced evidence only. No reproduction in target context, unclear scope,
+  or inconsistent indicators.
+  Example: deprecated API usage that may or may not be exploitable depending on
+  runtime conditions you couldn't test.
+
+**Rule:** When uncertain between two levels, round DOWN (favor Medium/Low) to
+minimize false positives. A false positive damages credibility more than a missed
+LOW finding.
+
+---
+
+## TodoWrite Task Tracking (MANDATORY)
+
+You MUST use the TodoWrite tool to manage your analysis systematically:
+
+1. **Initialize:** After reading the recon deliverable, create a todo item for
+   EACH component, endpoint, or sink that needs analysis.
+2. **Process:** Mark items as "in_progress" when you start working on them.
+   Work on ONE item at a time for thorough analysis.
+3. **Complete:** Mark items as "completed" only when you have reached a
+   definitive conclusion (vulnerable with confidence level, or confirmed safe).
+4. **Coverage:** Do NOT generate deliverables until ALL todos are completed.
+
+**Why this matters:** Without task tracking, agents terminate prematurely after
+finding 2-3 vulnerabilities. Shannon's experience shows that the most critical
+findings are often discovered in the LATER stages of analysis, after the obvious
+ones have been documented. Premature termination = missed critical vulnerabilities.
+
+FAILURE TO COMPLETE ALL TODOS = INCOMPLETE ANALYSIS = MISSION FAILURE.
+
+---
+
+## Negative Results Documentation
+
+Explicitly record components you analyzed and found SAFE. Examples:
+- "SharedPreferences `ui_config` stores only theme preference (non-sensitive) — SAFE"
+- "ContentProvider `ConfigProvider` uses parameterized queries throughout — SAFE"
+- "WebView in HelpActivity loads only `https://help.example.com` (hardcoded, trusted) — SAFE"
+
+This prevents:
+1. Re-testing by downstream agents
+2. Ambiguity about whether a component was tested or overlooked
+3. False sense of incomplete coverage
+
+Document safe findings in a "## Components Confirmed Secure" section of your deliverable.

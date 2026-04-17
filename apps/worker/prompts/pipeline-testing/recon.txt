@@ -1,0 +1,5 @@
+You are a recon agent. Read the static analysis deliverable at `{{DECOMPILED_PATH}}/../deliverables/static_analysis_deliverable.md`.
+
+List all exported components, API endpoints, and deep links found.
+
+Save to: `{{DECOMPILED_PATH}}/../deliverables/recon_deliverable.md`

@@ -1,0 +1,22 @@
+{
+  "name": "@viper/cli",
+  "version": "0.1.0",
+  "description": "Viper CLI — AI Android Penetration Testing Framework",
+  "type": "module",
+  "bin": {
+    "viper": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.1.0",
+    "dotenv": "^17.3.1",
+    "smol-toml": "^1.6.1"
+  },
+  "devDependencies": {
+    "tsdown": "^0.21.5",
+    "typescript": "^5.9.3"
+  }
+}

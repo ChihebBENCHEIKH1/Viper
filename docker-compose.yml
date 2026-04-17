@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  viper-temporal:
+    container_name: viper-temporal
+    image: temporalio/auto-setup:1.25
+    ports:
+      - '7233:7233'
+      - '8233:8233'
+    environment:
+      - DB=sqlite
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    networks:
+      - viper-net
+    healthcheck:
+      test: ['CMD', 'temporal', 'operator', 'cluster', 'health']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  viper-emulator:
+    container_name: viper-emulator
+    image: budtmo/docker-android:emulator_14.0
+    privileged: true
+    ports:
+      - '5555:5555'   # ADB
+      - '6080:6080'   # noVNC
+      - '27042:27042' # Frida server
+      - '8080:8080'   # mitmproxy web UI
+    environment:
+      - EMULATOR_DEVICE=pixel_7
+      - WEB_VNC=true
+    devices:
+      - /dev/kvm
+    networks:
+      - viper-net
+    profiles:
+      - emulator
+
+networks:
+  viper-net:
+    name: viper-net

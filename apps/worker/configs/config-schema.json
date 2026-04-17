@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Viper Configuration",
+  "description": "Configuration for Android application penetration testing",
+  "type": "object",
+  "properties": {
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Target application description and testing context"
+    },
+    "authentication": {
+      "type": "object",
+      "description": "App authentication credentials for testing",
+      "properties": {
+        "credentials": {
+          "type": "object",
+          "required": ["username", "password"],
+          "properties": {
+            "username": { "type": "string", "minLength": 1 },
+            "password": { "type": "string", "minLength": 1 },
+            "pin": { "type": "string" },
+            "totp_secret": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "login_flow": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Step-by-step login instructions"
+        }
+      },
+      "required": ["credentials"],
+      "additionalProperties": false
+    },
+    "emulator": {
+      "type": "object",
+      "description": "Android emulator configuration",
+      "properties": {
+        "api_level": {
+          "type": "integer",
+          "minimum": 24,
+          "maximum": 36,
+          "default": 34
+        },
+        "device_profile": {
+          "type": "string",
+          "default": "pixel_7"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "object",
+      "properties": {
+        "avoid": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rule"
+          }
+        },
+        "focus": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rule"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "pipeline": {
+      "type": "object",
+      "properties": {
+        "retry_preset": {
+          "type": "string",
+          "enum": ["default", "subscription"]
+        },
+        "max_concurrent_pipelines": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "anyOf": [
+    { "required": ["description"] },
+    { "required": ["authentication"] },
+    { "required": ["rules"] },
+    { "required": ["emulator"] }
+  ],
+  "definitions": {
+    "rule": {
+      "type": "object",
+      "required": ["description", "type", "value"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "enum": ["activity", "service", "receiver", "provider", "package", "endpoint", "permission"]
+        },
+        "value": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

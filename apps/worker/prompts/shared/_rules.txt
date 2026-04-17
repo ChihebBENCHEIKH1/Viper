@@ -1,0 +1,10 @@
+<rules>
+## Avoidance Rules
+{{RULES_AVOID}}
+
+## Focus Rules
+{{RULES_FOCUS}}
+
+## Authentication
+{{AUTH_CONTEXT}}
+</rules>

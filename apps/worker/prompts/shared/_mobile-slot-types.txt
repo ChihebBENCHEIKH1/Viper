@@ -1,0 +1,114 @@
+## Mobile Sink Slot Types
+
+Every dangerous sink has typed "slots" — positions where data enters the operation.
+Each slot type requires a SPECIFIC defense. Using the wrong defense for a slot is a
+vulnerability even if SOME sanitization exists.
+
+### ContentProvider SQL Slots
+- **CP-selection:** The WHERE clause of a ContentProvider query().
+  Defense: Parameterized selectionArgs (? placeholders).
+  Mismatch: String concatenation into selection, regex escaping, generic sanitize().
+- **CP-projection:** Column names passed to query(). Column names cannot be parameterized.
+  Defense: Strict whitelist of allowed column names.
+  Mismatch: User input passed directly, regex filtering, blacklist approach.
+- **CP-sortOrder:** ORDER BY clause. Cannot be parameterized.
+  Defense: Strict whitelist of allowed columns + ASC/DESC only.
+  Mismatch: Any user input without explicit whitelist validation.
+- **CP-uri:** The content:// URI path segments.
+  Defense: Path validation, no user-controlled segments, authority verification.
+  Mismatch: User input embedded in URI path without validation.
+
+### Intent Slots
+- **INTENT-action:** The action string (e.g., "com.app.ACTION_PAY").
+  Defense: Explicit action constants, never user-controlled.
+  Mismatch: Dynamic action construction from user input.
+- **INTENT-component:** Target component (Activity, Service, Receiver).
+  Defense: Explicit ComponentName for ALL sensitive operations.
+  Mismatch: Implicit intent (no component) for operations handling sensitive data.
+- **INTENT-extras:** Key-value data attached to Intent.
+  Defense: Type validation (getStringExtra with null check), range checks, sanitization
+  before use in sensitive operations.
+  Mismatch: Unvalidated extras used directly in SQL queries, file paths, WebView URLs,
+  or passed to other components without sanitization.
+- **INTENT-data:** The data URI (e.g., "myapp://action?param=value").
+  Defense: Scheme + host whitelist, path validation, parameter sanitization.
+  Mismatch: User-controlled URI without scheme/host/path validation, open redirects.
+
+### WebView Slots
+- **WV-loadUrl:** URL passed to WebView.loadUrl().
+  Defense: Strict URL whitelist (HTTPS + trusted domains only), no user input in URL.
+  Mismatch: User-controlled URL, HTTP allowed, javascript: scheme not blocked.
+- **WV-evaluateJs:** JavaScript string passed to evaluateJavascript().
+  Defense: No user input in JavaScript strings. Use postMessage for data passing.
+  Mismatch: Any user-controlled content concatenated into JavaScript string.
+- **WV-jsInterface:** Methods exposed via addJavascriptInterface().
+  Defense: Minimal @JavascriptInterface methods, no sensitive operations, API 17+ only.
+  Mismatch: Sensitive methods exposed (file access, network requests, credential retrieval),
+  pre-API-17 usage (allows reflection).
+- **WV-fileAccess:** File access settings.
+  Defense: setAllowFileAccess(false), setAllowFileAccessFromFileURLs(false),
+  setAllowUniversalAccessFromFileURLs(false).
+  Mismatch: Any file access enabled when loading untrusted content.
+
+### File I/O Slots
+- **FILE-path:** File path construction for read/write operations.
+  Defense: File.getCanonicalPath() + startsWith(getFilesDir()) boundary check.
+  Mismatch: User input in path without canonicalization, ../ blacklist only (bypassable),
+  no boundary check after canonicalization.
+- **FILE-content:** Data written to files.
+  Defense: EncryptedFile or encryption for sensitive data, non-sensitive data only in plaintext.
+  Mismatch: Plaintext tokens, credentials, PII, financial data in files.
+- **FILE-mode:** File open mode / permissions.
+  Defense: Context.MODE_PRIVATE (default).
+  Mismatch: MODE_WORLD_READABLE, MODE_WORLD_WRITEABLE, or files in external storage
+  without encryption.
+
+### SharedPreferences Slots
+- **SP-key:** SharedPreferences key name.
+  Defense: Constant key names only, never user-controlled.
+  Mismatch: User-controlled key names (enables overwriting other preferences).
+- **SP-value:** SharedPreferences stored value.
+  Defense: EncryptedSharedPreferences for sensitive data (tokens, credentials, PII).
+  Mismatch: Plaintext storage of auth tokens, passwords, session IDs, PII, API keys.
+
+### Logging Slots
+- **LOG-message:** Data in Log.d/e/i/w/v messages.
+  Defense: No sensitive data in release builds. Use ProGuard/R8 to strip Log calls,
+  or Timber with a release-only no-op tree.
+  Mismatch: Tokens, passwords, PII, stack traces with sensitive data in release logs.
+
+---
+
+## Sanitization-to-Sink Matching Rules
+
+For each source→sink path, verify the sanitization MATCHES the slot type:
+
+| Sink Context | Slot | Correct Defense | Common Mismatches (= VULNERABLE) |
+|-------------|------|----------------|----------------------------------|
+| ContentProvider | CP-selection | Parameterized selectionArgs | String concat, regex, generic escape |
+| ContentProvider | CP-projection | Strict column whitelist | User input, regex filter, blacklist |
+| ContentProvider | CP-sortOrder | Column + direction whitelist | Any user input without whitelist |
+| Intent | INTENT-component | Explicit ComponentName | Implicit intent for sensitive ops |
+| Intent | INTENT-extras | Type validation + range check | Unvalidated extras in SQL/file/URL |
+| WebView | WV-loadUrl | URL whitelist, HTTPS-only | User URL input, HTTP, javascript: |
+| WebView | WV-evaluateJs | No user input in JS string | String concat with user data |
+| File I/O | FILE-path | canonicalPath + boundary | Path concat, ../ blacklist |
+| SharedPreferences | SP-value | EncryptedSharedPreferences | Plaintext sensitive data |
+| Logging | LOG-message | Strip in release builds | Sensitive data in release logs |
+
+---
+
+## Post-Sanitization Mutation Detection
+
+A sanitization is NULLIFIED if the data is modified between sanitization and the sink.
+
+**Flag when:**
+- Data is concatenated into SQL string AFTER parameterization was set up elsewhere
+- Validated URL is modified (append query params) AFTER whitelist check
+- Canonical file path has segments appended AFTER boundary check
+- Intent extras are added AFTER component was set to explicit
+- Any string concatenation, format(), or StringBuilder.append() occurs BETWEEN
+  the sanitization call and the dangerous sink
+
+**Rule:** If concat/modification occurs after sanitization on the SAME data path,
+treat that sanitization as NON-EFFECTIVE for vulnerability classification purposes.

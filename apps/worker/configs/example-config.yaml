@@ -1,0 +1,45 @@
+# Viper Configuration Example
+# See config-schema.json for full schema documentation
+
+# Target app description (helps agents focus)
+description: "Banking app v2.3.1 — focus on payment and auth flows"
+
+# App credentials for authenticated testing
+authentication:
+  credentials:
+    username: "testuser@example.com"
+    password: "TestPass123"
+    pin: "1234"
+    # totp_secret: "JBSWY3DPEHPK3PXP"  # Uncomment if 2FA is needed
+  login_flow:
+    - "Enter username in the email field"
+    - "Enter password in the password field"
+    - "Tap the Sign In button"
+    - "Enter PIN on the verification screen"
+
+# Android emulator settings
+emulator:
+  api_level: 34
+  device_profile: "pixel_7"
+
+# Testing boundaries
+rules:
+  avoid:
+    - description: "Skip payment processing to avoid charges"
+      type: activity
+      value: "com.app.PaymentActivity"
+    - description: "Skip account deletion flow"
+      type: endpoint
+      value: "/api/v1/account/delete"
+  focus:
+    - description: "Prioritize authentication flows"
+      type: activity
+      value: "com.app.LoginActivity"
+    - description: "Focus on user data endpoints"
+      type: endpoint
+      value: "/api/v1/user/*"
+
+# Pipeline settings
+pipeline:
+  retry_preset: default
+  # max_concurrent_pipelines: 3

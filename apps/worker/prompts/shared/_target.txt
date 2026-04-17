@@ -1,0 +1,14 @@
+<target>
+APK: {{APK_PATH}}
+Package: {{PACKAGE_NAME}}
+Source Code: {{SOURCE_PATH}}
+Decompiled Source (JADX): {{DECOMPILED_PATH}}/jadx/
+Extracted Resources (APKTool): {{DECOMPILED_PATH}}/apktool/
+AndroidManifest.xml: {{DECOMPILED_PATH}}/apktool/AndroidManifest.xml
+
+Emulator: Android API {{API_LEVEL}} via ADB at {{EMULATOR_HOST}}:{{EMULATOR_PORT}}
+Frida: Running on emulator — use frida-mcp tools for runtime instrumentation
+App is installed and launchable on the emulator.
+
+{{DESCRIPTION}}
+</target>
