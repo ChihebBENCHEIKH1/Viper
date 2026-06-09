@@ -84,7 +84,12 @@ export async function pentestPipelineWorkflow(input: PipelineInput): Promise<Pip
 
   const activities = proxyActivities<PipelineActivities>({
     startToCloseTimeout: '2h',
-    heartbeatTimeout: '5m',
+    // Agents run a single long-lived claude CLI call (often 10-20 min) without
+    // emitting Temporal heartbeats. A 5m heartbeatTimeout therefore fired
+    // mid-agent and retried the activity while the original kept running —
+    // burning duplicate model spend with no progress. Until the activity sends
+    // periodic heartbeat()s, keep this >= the longest expected agent runtime.
+    heartbeatTimeout: '30m',
     retry: {
       initialInterval: retryConfig.initialInterval,
       maximumInterval: retryConfig.maximumInterval,
@@ -105,9 +110,13 @@ export async function pentestPipelineWorkflow(input: PipelineInput): Promise<Pip
   const emulatorPort = input.emulatorPort || 5555;
   const workspaceDir = `workspaces/${sessionId}`;
   const decompiledDir = `${workspaceDir}/decompiled`;
+  const artifactPath = input.artifactPath ?? input.apkPath;
+  const platform = input.platform ?? 'android';
 
   const activityInput: ActivityInput = {
     apkPath: input.apkPath,
+    artifactPath,
+    platform,
     ...(input.sourcePath && { sourcePath: input.sourcePath }),
     sessionId,
     ...(input.configPath && { configPath: input.configPath }),

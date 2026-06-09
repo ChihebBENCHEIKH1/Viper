@@ -176,7 +176,7 @@ For each finding:
 ---
 
 ## Android-Specific Attack Techniques
-@include(shared/_android-attacks.txt)
+@include(shared/_{{PLATFORM}}-attacks.txt)
 
 ---
 

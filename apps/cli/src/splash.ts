@@ -21,11 +21,11 @@ ${GREEN}${BOLD}  ╚██╗ ██╔╝██║██╔═══╝ ██�
 ${GREEN}${BOLD}   ╚████╔╝ ██║██║     ███████╗██║  ██║${RESET}
 ${GREEN}${BOLD}    ╚═══╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝${RESET}
 
-${CYAN}  AI Android Penetration Testing Framework${ver ? ` ${GRAY}${ver}` : ''}${RESET}
+${CYAN}  AI Mobile (Android & iOS) Penetration Testing Framework${ver ? ` ${GRAY}${ver}` : ''}${RESET}
 
   ${GRAY}╔═══════════════════════════════════════════════╗${RESET}
   ${GRAY}║${RESET}  ${BOLD}Autonomous mobile security testing powered${RESET}   ${GRAY}║${RESET}
-  ${GRAY}║${RESET}  ${BOLD}by Claude • Frida • Appium • JADX${RESET}            ${GRAY}║${RESET}
+  ${GRAY}║${RESET}  ${BOLD}by Claude • Frida • JADX • otool • LIEF${RESET}      ${GRAY}║${RESET}
   ${GRAY}╚═══════════════════════════════════════════════╝${RESET}
 
   ${RED}🔒 DEFENSIVE SECURITY ONLY — Authorized testing only 🔒${RESET}

@@ -44,17 +44,28 @@ RUN curl -sL "https://github.com/skylot/jadx/releases/download/v${JADX_VERSION}/
     rm /tmp/jadx.zip
 ENV PATH="/opt/jadx/bin:${PATH}"
 
-# Install APKTool
-ARG APKTOOL_VERSION=2.10.0
-RUN curl -sL "https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool" -o /usr/local/bin/apktool && \
-    curl -sL "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar" -o /usr/local/bin/apktool.jar && \
-    chmod +x /usr/local/bin/apktool
+# Install APKTool (vendored in build context — see vendor/; avoids flaky in-build downloads)
+COPY vendor/apktool /usr/local/bin/apktool
+COPY vendor/apktool.jar /usr/local/bin/apktool.jar
+RUN chmod +x /usr/local/bin/apktool
 
-# Install Frida tools
+# Install Frida tools (Android + iOS dynamic client)
 RUN pip3 install --break-system-packages frida-tools objection
 
 # Install mitmproxy
 RUN pip3 install --break-system-packages mitmproxy
+
+# === iOS static-analysis tooling (Linux-runnable) ===
+# LIEF parses Mach-O (load commands, LC_ENCRYPTION_INFO/cryptid, symbols, libs);
+# binutils provides nm/strings/objdump for the binary; Python stdlib `plistlib`
+# reads binary + XML plists; unzip (above) extracts the .ipa.
+# iOS DYNAMIC (Frida/objection on a jailbroken device) reuses the Frida client
+# above + libimobiledevice when a device is attached — installed best-effort so
+# the image still builds where those packages are unavailable.
+RUN pip3 install --break-system-packages lief
+RUN apk add --no-cache binutils && \
+    (apk add --no-cache libimobiledevice ideviceinstaller libusbmuxd 2>/dev/null || \
+     echo "NOTE: libimobiledevice not available — iOS USB/dynamic needs it; static analysis unaffected")
 
 # Copy built worker
 WORKDIR /app

@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import type { ParsedStartArgs } from '../index.js';
+import { detectPlatform } from '../platform.js';
 import { displaySplash } from '../splash.js';
 import {
   ensureInfra,
@@ -21,6 +22,32 @@ import {
 
 export interface StartOptions extends ParsedStartArgs {
   version: string;
+}
+
+/**
+ * Detect a connected iOS device via libimobiledevice (Linux/macOS). Dynamic iOS
+ * testing requires a jailbroken device reachable over usbmuxd.
+ */
+function checkIosDevice(): { udid: string; name: string } {
+  try {
+    const out = execSync('idevice_id -l', { encoding: 'utf-8' }).trim();
+    const udid = out.split('\n').map((l) => l.trim()).filter(Boolean)[0];
+    if (!udid) {
+      console.error('ERROR: No iOS device detected. Connect a jailbroken device and trust this host.');
+      console.error('  (libimobiledevice / usbmuxd must be running.)');
+      process.exit(1);
+    }
+    let name = 'iOS device';
+    try {
+      name = execSync(`ideviceinfo -u ${udid} -k DeviceName`, { encoding: 'utf-8' }).trim() || name;
+    } catch {
+      /* DeviceName is best-effort */
+    }
+    return { udid, name };
+  } catch {
+    console.error('ERROR: libimobiledevice not found. Install it (idevice_id / ideviceinstaller) for iOS USB testing.');
+    process.exit(1);
+  }
 }
 
 function checkUsbDevice(): { serial: string; model: string; rooted: boolean } {
@@ -58,25 +85,87 @@ function checkUsbDevice(): { serial: string; model: string; rooted: boolean } {
 export async function start(options: StartOptions): Promise<void> {
   displaySplash(options.version);
 
-  // 1. Validate APK
+  // 1. Validate artifact + resolve platform (.apk/.aab => android, .ipa => ios)
   const apkPath = resolve(options.apk);
   if (!existsSync(apkPath)) {
-    console.error(`ERROR: APK not found: ${apkPath}`);
+    console.error(`ERROR: Artifact not found: ${apkPath}`);
     process.exit(1);
   }
-  if (!apkPath.endsWith('.apk')) {
-    console.error('ERROR: File must be an .apk file');
+  let platform: 'android' | 'ios';
+  try {
+    platform = detectPlatform(apkPath, options.platform);
+  } catch (e) {
+    console.error(`ERROR: ${e instanceof Error ? e.message : String(e)}`);
     process.exit(1);
   }
 
   const isUsb = options.deviceMode === 'usb';
+  const deviceLabel = isUsb
+    ? 'Real device (USB)'
+    : platform === 'ios'
+      ? 'None (static-only)'
+      : 'Docker emulator';
 
-  console.log(`  APK:        ${apkPath}`);
+  console.log(`  Artifact:   ${apkPath}`);
+  console.log(`  Platform:   ${platform}`);
   if (options.source) console.log(`  Source:     ${resolve(options.source)}`);
   if (options.config) console.log(`  Config:     ${resolve(options.config)}`);
-  console.log(`  Device:     ${isUsb ? 'Real phone (USB)' : 'Docker emulator'}`);
+  console.log(`  Device:     ${deviceLabel}`);
   console.log(`  Mode:       ${options.pipelineTesting ? 'Pipeline Testing' : 'Production'}`);
   console.log();
+
+  // === iOS Flow (static-only by default; dynamic requires a jailbroken device) ===
+  if (platform === 'ios') {
+    const sessionId = options.workspace || `scan-${crypto.randomBytes(4).toString('hex')}`;
+
+    console.log('  [1/3] Starting infrastructure...');
+    await ensureInfra();
+
+    let iosDevice: { udid: string; name: string } | undefined;
+    if (isUsb) {
+      console.log('  [2/3] Checking iOS device...');
+      iosDevice = checkIosDevice();
+      console.log(`  Found: ${iosDevice.name} (${iosDevice.udid})`);
+      try {
+        execSync(`ideviceinstaller -u ${iosDevice.udid} -i "${apkPath}"`, { stdio: 'inherit' });
+      } catch {
+        console.warn('  IPA install failed — may already be installed or device issue');
+      }
+    } else {
+      console.log('  [2/3] iOS static analysis (no device — dynamic needs --device usb + jailbroken device)');
+    }
+
+    console.log('  [3/3] Spawning worker...\n');
+    const worker = spawnWorker({
+      apkPath,
+      platform: 'ios',
+      sessionId,
+      version: options.version,
+      pipelineTesting: options.pipelineTesting,
+      ...(isUsb && iosDevice
+        ? { emulatorHost: 'host.docker.internal', emulatorPort: 27042, deviceUdid: iosDevice.udid }
+        : {}),
+      ...(options.source && { sourcePath: resolve(options.source) }),
+      ...(options.config && { configPath: resolve(options.config) }),
+      ...(options.output && { outputPath: resolve(options.output) }),
+    });
+
+    console.log(`  Workspace: ${sessionId}`);
+    console.log(`  Monitor:   http://localhost:8233`);
+    console.log(`  Logs:      viper logs ${sessionId}`);
+    console.log();
+
+    worker.on('exit', (code) => {
+      if (code === 0) {
+        console.log('\n  Pipeline completed successfully.');
+        console.log(`  Report: workspaces/${sessionId}/deliverables/executive_report.md`);
+      } else {
+        console.error(`\n  Pipeline failed (exit code ${code}).`);
+        process.exit(code || 1);
+      }
+    });
+    return;
+  }
 
   if (isUsb) {
     // === USB Device Flow ===
@@ -107,6 +196,7 @@ export async function start(options: StartOptions): Promise<void> {
 
     const worker = spawnWorker({
       apkPath,
+      platform: 'android',
       sessionId,
       version: options.version,
       pipelineTesting: options.pipelineTesting,
@@ -148,6 +238,7 @@ export async function start(options: StartOptions): Promise<void> {
 
     const worker = spawnWorker({
       apkPath,
+      platform: 'android',
       sessionId,
       version: options.version,
       pipelineTesting: options.pipelineTesting,

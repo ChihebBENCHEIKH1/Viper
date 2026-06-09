@@ -24,6 +24,7 @@ import { Timer } from '../utils/metrics.js';
 import { resolveModel } from './models.js';
 import type { ModelTier, AgentPhase } from '../types/agents.js';
 import { createMcpConfigFile } from './mcp-config.js';
+import type { Platform } from '../types/platform.js';
 import { executeViaCli, type CliMessageLoopResult } from './cli-executor.js';
 
 // === Types ===
@@ -305,11 +306,12 @@ export async function runClaudePrompt(
   logger: ActivityLogger,
   modelTier: ModelTier = 'medium',
   phase: AgentPhase = 'vuln',
+  platform: Platform = 'android',
   emulatorHost: string = 'viper-emulator',
   emulatorPort: number = 5555,
 ): Promise<ClaudePromptResult> {
-  // Create MCP config for this agent (Appium + Frida + Android-MCP)
-  const mcpConfigPath = createMcpConfigFile(cwd, agentName, phase, emulatorHost, emulatorPort);
+  // Create MCP config for this agent (platform-aware: Android vs iOS servers)
+  const mcpConfigPath = createMcpConfigFile(cwd, agentName, phase, platform, emulatorHost, emulatorPort);
 
   const useSdk = process.env['VIPER_USE_SDK'] === '1';
 

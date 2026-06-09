@@ -1,0 +1,52 @@
+### iOS Attack Techniques & Checks (OWASP MASVS / MASTG)
+
+Apply these against the decompiled IPA (Payload/*.app), Info.plist, entitlements,
+and the Mach-O binary. Trace from sinks back to sources, as on Android.
+
+#### MASVS-STORAGE — Insecure Data Storage
+- **NSUserDefaults** stores plaintext in `<app>/Library/Preferences/*.plist` — never for secrets/tokens.
+- **Keychain** misuse: `kSecAttrAccessibleAlways` / `...AfterFirstUnlock` (vs `...WhenUnlockedThisDeviceOnly`),
+  missing `kSecAttrAccessControl` / biometric gating, `kSecAttrSynchronizable` leaking to iCloud.
+- **SQLite / Core Data / Realm** stored unencrypted under `<app>/Documents` or `Library/Application Support`.
+- **Plist / files** written to `Documents` (backed up to iCloud/iTunes unless excluded).
+- **Caches**: `NSURLCache`, WKWebView caches, and **app snapshots** (`Library/Caches/Snapshots`) capturing
+  sensitive screens on backgrounding (mitigate with a blur/overlay in `applicationDidEnterBackground`).
+- **Pasteboard** (`UIPasteboard.general`) leaking secrets; logs via `NSLog`/`os_log`.
+
+#### MASVS-CRYPTO — Cryptography
+- Hardcoded keys/secrets in the binary (`strings`, `__cstring`, embedded plists) or `Info.plist`.
+- Weak/legacy: MD5/SHA1 for security, ECB mode, static IVs, `arc4random`-free PRNG for key material,
+  `CommonCrypto` misuse. Prefer CryptoKit / Secure Enclave.
+
+#### MASVS-NETWORK — Communication
+- **App Transport Security (ATS)** in Info.plist: `NSAllowsArbitraryLoads=true`,
+  `NSAllowsArbitraryLoadsInWebContent`, `NSExceptionAllowsInsecureHTTPLoads`, low `NSExceptionMinimumTLSVersion`.
+- **No certificate pinning** (no `URLSession:didReceiveChallenge:` validation, no TrustKit / pinned keys).
+- Sensitive data in URLs/query strings; mixed content in WKWebView.
+
+#### MASVS-PLATFORM — Platform Interaction
+- **Custom URL schemes** (`CFBundleURLTypes`) without validation → scheme hijacking / unvalidated input.
+- **Universal Links** / `apple-app-site-association` scope errors.
+- **WKWebView**: `javaScriptEnabled` with untrusted content, `WKScriptMessageHandler` bridges exposing native
+  APIs, `allowFileAccessFromFileURLs`, loading remote HTTP.
+- **App extensions / app groups** sharing data via shared containers.
+- Excessive/unused entitlements; overly broad `NSAppTransportSecurity`, background modes, or privacy usage strings.
+
+#### MASVS-RESILIENCE — Reverse-Engineering Defenses
+- **No jailbreak detection** (no checks for `/Applications/Cydia.app`, `/bin/bash`, `fork()`, suspicious dylibs,
+  `canOpenURL:"cydia://"`).
+- **No anti-debug** (`ptrace(PT_DENY_ATTACH)`, `sysctl` P_TRACED checks) and **no anti-Frida/Cycript** detection.
+- **Missing binary hardening**: not compiled PIE, no stack canaries (`__stack_chk`), ARC disabled,
+  encryption removed (`cryptid 0` in `LC_ENCRYPTION_INFO` — already-decrypted/sideloaded), debug symbols present.
+- No code obfuscation; readable Objective-C selectors / Swift metadata.
+
+#### MASVS-CODE — Code Quality
+- Outdated third-party SDKs/Frameworks (check `Frameworks/`, CocoaPods/SPM manifests) with known CVEs.
+- Verbose logging (`NSLog`, `print`) of tokens/PII; debug flags / test endpoints shipped.
+
+#### Static commands worth running
+- `plistutil -i <app>/Info.plist` (ATS, URL schemes, entitlements usage strings)
+- `codesign -d --entitlements :- <app>` (entitlements, app groups, keychain access groups)
+- `otool -hl <binary>` (PIE? `LC_ENCRYPTION_INFO` cryptid? stack canary?), `otool -L` (linked libs)
+- `strings -a <binary>` and `nm <binary>` (hardcoded secrets, symbols, weak APIs)
+- `class-dump <binary>` (Objective-C headers/selectors), Swift demangling for Swift apps

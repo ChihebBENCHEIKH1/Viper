@@ -20,6 +20,8 @@ function buildSessionMetadata(input: ActivityInput): SessionMetadata {
   return {
     sessionId: input.sessionId,
     apkPath: input.apkPath,
+    artifactPath: input.artifactPath,
+    platform: input.platform,
     ...(input.sourcePath && { sourcePath: input.sourcePath }),
     workspaceDir: input.workspaceDir,
     decompiledDir: input.decompiledDir,
@@ -57,6 +59,8 @@ export async function runStaticAnalysis(input: ActivityInput): Promise<AgentMetr
       {
         agentName: 'static-analysis',
         apkPath: input.apkPath,
+        artifactPath: input.artifactPath,
+        platform: input.platform,
         ...(input.sourcePath && { sourcePath: input.sourcePath }),
         ...(input.configPath && { configPath: input.configPath }),
         pipelineTestingMode: input.pipelineTestingMode,
@@ -80,6 +84,8 @@ export async function runRecon(input: ActivityInput): Promise<AgentMetrics> {
       {
         agentName: 'recon',
         apkPath: input.apkPath,
+        artifactPath: input.artifactPath,
+        platform: input.platform,
         ...(input.sourcePath && { sourcePath: input.sourcePath }),
         ...(input.configPath && { configPath: input.configPath }),
         pipelineTestingMode: input.pipelineTestingMode,
@@ -104,6 +110,8 @@ export async function runVulnAnalysis(input: ActivityInput, vulnType: string): P
       {
         agentName,
         apkPath: input.apkPath,
+        artifactPath: input.artifactPath,
+        platform: input.platform,
         ...(input.sourcePath && { sourcePath: input.sourcePath }),
         ...(input.configPath && { configPath: input.configPath }),
         pipelineTestingMode: input.pipelineTestingMode,
@@ -128,6 +136,8 @@ export async function runExploitation(input: ActivityInput, vulnType: string): P
       {
         agentName,
         apkPath: input.apkPath,
+        artifactPath: input.artifactPath,
+        platform: input.platform,
         ...(input.sourcePath && { sourcePath: input.sourcePath }),
         ...(input.configPath && { configPath: input.configPath }),
         pipelineTestingMode: input.pipelineTestingMode,
@@ -158,6 +168,8 @@ export async function runReport(input: ActivityInput): Promise<AgentMetrics> {
       {
         agentName: 'report',
         apkPath: input.apkPath,
+        artifactPath: input.artifactPath,
+        platform: input.platform,
         ...(input.sourcePath && { sourcePath: input.sourcePath }),
         ...(input.configPath && { configPath: input.configPath }),
         pipelineTestingMode: input.pipelineTestingMode,

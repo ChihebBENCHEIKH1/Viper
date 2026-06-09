@@ -1,0 +1,40 @@
+
+[32m[1m  ██╗   ██╗██╗██████╗ ███████╗██████╗[0m
+[32m[1m  ██║   ██║██║██╔══██╗██╔════╝██╔══██╗[0m
+[32m[1m  ██║   ██║██║██████╔╝█████╗  ██████╔╝[0m
+[32m[1m  ╚██╗ ██╔╝██║██╔═══╝ ██╔══╝  ██╔══██╗[0m
+[32m[1m   ╚████╔╝ ██║██║     ███████╗██║  ██║[0m
+[32m[1m    ╚═══╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝[0m
+
+[36m  AI Mobile (Android & iOS) Penetration Testing Framework [90m v0.1.0[0m
+
+  [90m╔═══════════════════════════════════════════════╗[0m
+  [90m║[0m  [1mAutonomous mobile security testing powered[0m   [90m║[0m
+  [90m║[0m  [1mby Claude • Frida • JADX • otool • LIEF[0m      [90m║[0m
+  [90m╚═══════════════════════════════════════════════╝[0m
+
+  [31m🔒 DEFENSIVE SECURITY ONLY — Authorized testing only 🔒[0m
+
+  Artifact:   /tmp/offmon.ipa
+  Platform:   ios
+  Source:     /home/chiheb/Documents/Teomach workspace/offmon/mobile/ios/offmon-photos/BackgraundUpload
+  Device:     None (static-only)
+  Mode:       Pipeline Testing
+
+  [1/3] Starting infrastructure...
+Starting Viper infrastructure...
+ Network viper-net  Creating
+ Network viper-net  Created
+ Container viper-temporal  Creating
+ Container viper-temporal  Created
+ Container viper-temporal  Starting
+ Container viper-temporal  Started
+Temporal is ready.
+  [2/3] iOS static analysis (no device — dynamic needs --device usb + jailbroken device)
+  [3/3] Spawning worker...
+
+Spawning worker: viper-worker-e016ec4d
+  Workspace: offmon-ios
+  Monitor:   http://localhost:8233
+  Logs:      viper logs offmon-ios
+

@@ -9,10 +9,13 @@
 import { AgentExecutionService } from './agent-execution.js';
 import { ConfigLoaderService } from './config-loader.js';
 import { ExploitationCheckerService } from './exploitation-checker.js';
+import type { Platform } from '../types/platform.js';
 
 export interface SessionMetadata {
   readonly sessionId: string;
   readonly apkPath: string;
+  readonly artifactPath: string;
+  readonly platform: Platform;
   readonly sourcePath?: string;
   readonly workspaceDir: string;
   readonly decompiledDir: string;

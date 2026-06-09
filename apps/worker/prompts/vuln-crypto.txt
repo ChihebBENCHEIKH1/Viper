@@ -38,7 +38,7 @@ key management practice, and insufficient credential protection in this applicat
 ---
 
 ## Frida Hook Patterns
-@include(shared/_frida-patterns.txt)
+@include(shared/_{{PLATFORM}}-frida-patterns.txt)
 
 ---
 

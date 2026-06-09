@@ -1,0 +1,114 @@
+### Common Frida Hooks for Android Security Testing
+
+Use these patterns as starting points. Adapt based on the target app's specific classes.
+
+#### Hook SharedPreferences writes (detect sensitive data storage)
+```javascript
+Java.perform(() => {
+  const Editor = Java.use('android.content.SharedPreferences$Editor');
+  Editor.putString.implementation = function(key, value) {
+    console.log(`[SharedPrefs] ${key} = ${value}`);
+    return this.putString(key, value);
+  };
+});
+```
+
+#### Hook SQLite queries (detect injection points)
+```javascript
+Java.perform(() => {
+  const SQLiteDatabase = Java.use('android.database.sqlite.SQLiteDatabase');
+  SQLiteDatabase.rawQuery.overload('java.lang.String', '[Ljava.lang.String;')
+    .implementation = function(sql, args) {
+      console.log(`[SQLite] ${sql} | args: ${args}`);
+      return this.rawQuery(sql, args);
+    };
+});
+```
+
+#### Hook SSL/TLS trust manager (bypass certificate pinning)
+```javascript
+Java.perform(() => {
+  const TrustManager = Java.use('javax.net.ssl.X509TrustManager');
+  const SSLContext = Java.use('javax.net.ssl.SSLContext');
+
+  // Create a permissive TrustManager
+  const TrustManagerImpl = Java.registerClass({
+    name: 'com.viper.TrustManager',
+    implements: [TrustManager],
+    methods: {
+      checkClientTrusted(chain, authType) {},
+      checkServerTrusted(chain, authType) {},
+      getAcceptedIssuers() { return []; }
+    }
+  });
+
+  // Override default SSLContext
+  const ctx = SSLContext.getInstance('TLS');
+  ctx.init(null, [TrustManagerImpl.$new()], null);
+  SSLContext.setDefault(ctx);
+  console.log('[SSL] Certificate pinning bypassed');
+});
+```
+
+#### Hook crypto operations (detect weak algorithms)
+```javascript
+Java.perform(() => {
+  const Cipher = Java.use('javax.crypto.Cipher');
+  Cipher.getInstance.overload('java.lang.String').implementation = function(algo) {
+    console.log(`[Crypto] Algorithm: ${algo}`);
+    return this.getInstance(algo);
+  };
+
+  const SecretKeySpec = Java.use('javax.crypto.spec.SecretKeySpec');
+  SecretKeySpec.$init.overload('[B', 'java.lang.String').implementation = function(key, algo) {
+    console.log(`[Crypto] Key for ${algo}: ${Java.array('byte', key)}`);
+    return this.$init(key, algo);
+  };
+});
+```
+
+#### Hook file I/O (detect insecure storage)
+```javascript
+Java.perform(() => {
+  const FileOutputStream = Java.use('java.io.FileOutputStream');
+  FileOutputStream.$init.overload('java.lang.String').implementation = function(path) {
+    console.log(`[FileIO] Writing to: ${path}`);
+    return this.$init(path);
+  };
+});
+```
+
+#### Hook Intent creation (detect IPC data leaks)
+```javascript
+Java.perform(() => {
+  const Intent = Java.use('android.content.Intent');
+  Intent.putExtra.overload('java.lang.String', 'java.lang.String').implementation = function(key, value) {
+    console.log(`[Intent] Extra: ${key} = ${value}`);
+    return this.putExtra(key, value);
+  };
+});
+```
+
+#### Hook WebView loadUrl (detect untrusted content loading)
+```javascript
+Java.perform(() => {
+  const WebView = Java.use('android.webkit.WebView');
+  WebView.loadUrl.overload('java.lang.String').implementation = function(url) {
+    console.log(`[WebView] Loading URL: ${url}`);
+    return this.loadUrl(url);
+  };
+});
+```
+
+#### Hook Log methods (detect sensitive data in logs)
+```javascript
+Java.perform(() => {
+  const Log = Java.use('android.util.Log');
+  ['d', 'i', 'w', 'e', 'v'].forEach(level => {
+    Log[level].overload('java.lang.String', 'java.lang.String').implementation = function(tag, msg) {
+      console.log(`[Log.${level}] ${tag}: ${msg}`);
+      return this[level](tag, msg);
+    };
+  });
+});
+```

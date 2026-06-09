@@ -11,6 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { AgentPhase } from '../types/agents.js';
+import type { Platform } from '../types/platform.js';
 
 interface McpServerConfig {
   command: string;
@@ -30,11 +31,19 @@ export function createMcpConfigFile(
   cwd: string,
   agentId: string,
   phase: AgentPhase,
+  platform: Platform,
   emulatorHost: string,
   emulatorPort: number,
 ): string | undefined {
   // Static analysis runs offline — no MCP servers needed
   if (phase === 'static-analysis') {
+    return undefined;
+  }
+
+  // iOS dynamic instrumentation requires a real (jailbroken) device reachable via
+  // libimobiledevice/usbmuxd. Without one (VIPER_DEVICE_UDID unset) iOS runs
+  // STATIC-ONLY — emit no MCP servers so the agent works from the decompiled IPA.
+  if (platform === 'ios' && !process.env['VIPER_DEVICE_UDID']) {
     return undefined;
   }
 
@@ -57,19 +66,30 @@ export function createMcpConfigFile(
     args: ['-y', 'frida-mcp'],
     env: {
       FRIDA_HOST: emulatorHost,
-      FRIDA_PORT: '27042',
+      FRIDA_PORT: process.env['VIPER_FRIDA_PORT'] || '27042',
     },
   };
 
-  // Android-MCP — ADB device control, file pull, logcat, component interaction
-  config.mcpServers['android'] = {
-    command: npxPath,
-    args: ['-y', 'android-mcp'],
-    env: {
-      ADB_HOST: emulatorHost,
-      ADB_PORT: String(emulatorPort),
-    },
-  };
+  if (platform === 'ios') {
+    // libimobiledevice — iOS device control (install, file pull, syslog) over usbmuxd
+    config.mcpServers['libimobiledevice'] = {
+      command: npxPath,
+      args: ['-y', 'libimobiledevice-mcp'],
+      env: {
+        DEVICE_UDID: process.env['VIPER_DEVICE_UDID'] || '',
+      },
+    };
+  } else {
+    // Android-MCP — ADB device control, file pull, logcat, component interaction
+    config.mcpServers['android'] = {
+      command: npxPath,
+      args: ['-y', 'android-mcp'],
+      env: {
+        ADB_HOST: emulatorHost,
+        ADB_PORT: String(emulatorPort),
+      },
+    };
+  }
 
   // Network agents get mitmproxy access
   if (agentId.includes('network')) {

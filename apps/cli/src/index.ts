@@ -36,7 +36,7 @@ function showHelp(): void {
   const prefix = mode === 'local' ? './viper' : 'npx @viper/cli';
 
   console.log(`
-Viper - AI Android Penetration Testing Framework
+Viper - AI Mobile (Android & iOS) Penetration Testing Framework
 
 Usage:${
     mode === 'local'
@@ -57,19 +57,25 @@ Usage:${
   ${prefix} help                                               Show this help
 
 Options for 'start':
-  -a, --apk <path>          APK file path (required)
+  -a, --apk <path>          Artifact: .apk/.aab (Android) or .ipa (iOS) (required)
   -s, --source <path>       Source code path (optional, enables white-box)
   -c, --config <path>       Configuration file (YAML)
   -o, --output <path>       Copy deliverables to this directory
   -w, --workspace <name>    Named workspace (auto-resumes if exists)
-      --device <mode>       Device mode: 'usb' (real phone), 'emulator' (default)
+      --platform <os>       Override auto-detection: 'android' or 'ios'
+      --device <mode>       Device mode: 'usb' (real device), 'emulator' (default)
       --emulator <name>     Android emulator profile (default: API 34)
       --pipeline-testing    Use minimal prompts for fast testing
+
+Platform is auto-detected from the artifact (.apk/.aab => Android, .ipa => iOS).
+iOS dynamic testing requires --device usb with a jailbroken device; otherwise iOS
+runs static-only on Linux.
 
 Examples:
   ${prefix} start -a ./app-debug.apk
   ${prefix} start -a ./app.apk -s ./android-project --device usb
-  ${prefix} start -a ./app.apk -s ./android-project -c config.yaml -w q1-audit
+  ${prefix} start -a ./app.ipa                       # iOS static (auto-detected)
+  ${prefix} start -a ./app.ipa --device usb          # iOS dynamic (jailbroken device)
   ${prefix} logs q1-audit
   ${prefix} stop --clean
 
@@ -87,6 +93,7 @@ export interface ParsedStartArgs {
   workspace?: string;
   output?: string;
   emulator?: string;
+  platform?: 'android' | 'ios';
   deviceMode: DeviceMode;
   pipelineTesting: boolean;
 }
@@ -98,6 +105,7 @@ function parseStartArgs(argv: string[]): ParsedStartArgs {
   let workspace: string | undefined;
   let output: string | undefined;
   let emulator: string | undefined;
+  let platform: 'android' | 'ios' | undefined;
   let deviceMode: DeviceMode = 'emulator';
   let pipelineTesting = false;
 
@@ -141,6 +149,15 @@ function parseStartArgs(argv: string[]): ParsedStartArgs {
           i++;
         }
         break;
+      case '--platform':
+        if (next && (next === 'android' || next === 'ios')) {
+          platform = next;
+          i++;
+        } else {
+          console.error("ERROR: --platform must be 'android' or 'ios'");
+          process.exit(1);
+        }
+        break;
       case '--device':
         if (next && (next === 'usb' || next === 'emulator')) {
           deviceMode = next;
@@ -180,6 +197,7 @@ function parseStartArgs(argv: string[]): ParsedStartArgs {
     ...(workspace && { workspace }),
     ...(output && { output }),
     ...(emulator && { emulator }),
+    ...(platform && { platform }),
   };
 }
 

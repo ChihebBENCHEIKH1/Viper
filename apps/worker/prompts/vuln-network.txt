@@ -43,7 +43,7 @@ to intercept, modify, or replay sensitive data in transit.
 ---
 
 ## Frida Hook Patterns
-@include(shared/_frida-patterns.txt)
+@include(shared/_{{PLATFORM}}-frida-patterns.txt)
 
 ---
 
