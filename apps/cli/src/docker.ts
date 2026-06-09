@@ -9,6 +9,8 @@
 
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -112,6 +114,7 @@ export async function ensureEmulator(apiLevel: number = 34): Promise<void> {
 
 export interface WorkerOptions {
   apkPath: string;
+  platform: 'android' | 'ios';
   sourcePath?: string;
   configPath?: string;
   outputPath?: string;
@@ -120,6 +123,7 @@ export interface WorkerOptions {
   pipelineTesting: boolean;
   emulatorHost?: string;
   emulatorPort?: number;
+  deviceUdid?: string;
 }
 
 export function spawnWorker(options: WorkerOptions): ChildProcess {
@@ -127,19 +131,30 @@ export function spawnWorker(options: WorkerOptions): ChildProcess {
   const suffix = randomSuffix();
   const containerName = `viper-worker-${suffix}`;
 
+  // Mount the artifact under a platform-appropriate name (.apk vs .ipa).
+  const artifactMount = options.platform === 'ios' ? '/app/target.ipa' : '/app/target.apk';
+
   const dockerArgs: string[] = [
     'run', '--rm',
     '--name', containerName,
     '--network', 'viper-net',
-    // Mount APK
-    '-v', `${path.resolve(options.apkPath)}:/app/target.apk:ro`,
+    // Mount artifact (apk/aab -> target.apk, ipa -> target.ipa)
+    '-v', `${path.resolve(options.apkPath)}:${artifactMount}:ro`,
     // Environment
-    '-e', `VIPER_APK_PATH=/app/target.apk`,
+    '-e', `VIPER_PLATFORM=${options.platform}`,
+    '-e', `VIPER_ARTIFACT_PATH=${artifactMount}`,
+    '-e', `VIPER_APK_PATH=${artifactMount}`, // back-compat alias
     '-e', `VIPER_SESSION_ID=${options.sessionId}`,
     '-e', `TEMPORAL_ADDRESS=viper-temporal:7233`,
     '-e', `VIPER_EMULATOR_HOST=${options.emulatorHost || 'viper-emulator'}`,
     '-e', `VIPER_EMULATOR_PORT=${String(options.emulatorPort || 5555)}`,
   ];
+
+  // iOS dynamic device wiring — only when a real jailbroken device is attached.
+  if (options.deviceUdid) {
+    dockerArgs.push('-e', `VIPER_DEVICE_UDID=${options.deviceUdid}`);
+    dockerArgs.push('-e', `VIPER_FRIDA_PORT=${String(options.emulatorPort || 27042)}`);
+  }
 
   // Mount source code if provided
   if (options.sourcePath) {
@@ -152,6 +167,13 @@ export function spawnWorker(options: WorkerOptions): ChildProcess {
     dockerArgs.push('-v', `${path.resolve(options.configPath)}:/app/config.yaml:ro`);
     dockerArgs.push('-e', 'VIPER_CONFIG_PATH=/app/config.yaml');
   }
+
+  // The worker uses cwd `workspaces/<sessionId>` for each agent but never creates it; a
+  // non-existent cwd makes the claude spawn hang. Back it with a host dir (pre-created) so
+  // the cwd exists and deliverables persist on the host.
+  const hostWorkspace = path.join(process.cwd(), 'workspaces');
+  fs.mkdirSync(path.join(hostWorkspace, options.sessionId), { recursive: true });
+  dockerArgs.push('-v', `${hostWorkspace}:/app/workspaces`);
 
   // Pipeline testing mode
   if (options.pipelineTesting) {
@@ -166,6 +188,26 @@ export function spawnWorker(options: WorkerOptions): ChildProcess {
   for (const varName of credentialVars) {
     const val = process.env[varName];
     if (val) dockerArgs.push('-e', `${varName}=${val}`);
+  }
+
+  // CLI subscription mode: ride the host's `claude login` session instead of an API key.
+  // Bind-mount the host Claude credentials read-only and point the worker at the bundled
+  // claude binary. HOME=/tmp so the CLI reads /tmp/.claude/.credentials.json.
+  dockerArgs.push('-e', 'HOME=/tmp');
+  // claude refuses --dangerously-skip-permissions as root unless IS_SANDBOX=1 (worker runs as root).
+  dockerArgs.push('-e', 'IS_SANDBOX=1');
+  dockerArgs.push(
+    '-e',
+    'CLAUDE_CLI_PATH=/app/apps/worker/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude',
+  );
+  const claudeHome = os.homedir();
+  const claudeMounts: Array<[string, string]> = [
+    [path.join(claudeHome, '.claude', '.credentials.json'), '/tmp/.claude/.credentials.json'],
+    [path.join(claudeHome, '.claude', 'config.json'), '/tmp/.claude/config.json'],
+    [path.join(claudeHome, '.claude.json'), '/tmp/.claude.json'],
+  ];
+  for (const [src, dest] of claudeMounts) {
+    if (fs.existsSync(src)) dockerArgs.push('-v', `${src}:${dest}:ro`);
   }
 
   // Shared memory for Chromium/Playwright

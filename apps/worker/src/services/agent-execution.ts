@@ -25,11 +25,14 @@ import type { ConfigLoaderService } from './config-loader.js';
 import { distributeConfig } from './config-loader.js';
 import { loadAndPreparePrompt } from './prompt-manager.js';
 import { runClaudePrompt, validateAgentOutput } from '../ai/claude-executor.js';
+import type { Platform } from '../types/platform.js';
 import { createGitCheckpoint, commitGitSuccess, rollbackGitWorkspace } from './git-manager.js';
 
 export interface AgentExecutionInput {
   readonly agentName: AgentName;
   readonly apkPath: string;
+  readonly artifactPath: string;
+  readonly platform: Platform;
   readonly sourcePath?: string;
   readonly configPath?: string;
   readonly pipelineTestingMode: boolean;
@@ -81,6 +84,8 @@ export class AgentExecutionService {
         agent.promptTemplate,
         {
           apkPath: input.apkPath,
+          artifactPath: input.artifactPath,
+          platform: input.platform,
           ...(input.sourcePath && { sourcePath: input.sourcePath }),
           decompiledDir: input.decompiledDir,
           emulatorHost: input.emulatorHost,
@@ -112,6 +117,7 @@ export class AgentExecutionService {
       logger,
       agent.modelTier,
       agent.phase,
+      input.platform,
       input.emulatorHost,
       input.emulatorPort,
     );

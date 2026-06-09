@@ -3,17 +3,18 @@ version: '3.8'
 services:
   viper-temporal:
     container_name: viper-temporal
-    image: temporalio/auto-setup:1.25
+    image: temporalio/temporal:latest
+    # Dev server (sqlite-backed) — auto-setup image does not support DB=sqlite. Matches Shannon.
+    command: ['server', 'start-dev', '--db-filename', '/home/temporal/temporal.db', '--ip', '0.0.0.0']
     ports:
-      - '7233:7233'
-      - '8233:8233'
-    environment:
-      - DB=sqlite
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - '7234:7233'   # host 7234 -> container 7233 (avoid clash with Shannon's Temporal)
+      - '8234:8233'   # host 8234 -> container 8233 (Temporal Web UI)
+    volumes:
+      - viper-temporal-data:/home/temporal
     networks:
       - viper-net
     healthcheck:
-      test: ['CMD', 'temporal', 'operator', 'cluster', 'health']
+      test: ['CMD', 'temporal', 'operator', 'cluster', 'health', '--address', 'localhost:7233']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -40,3 +41,6 @@ services:
 networks:
   viper-net:
     name: viper-net
+
+volumes:
+  viper-temporal-data:

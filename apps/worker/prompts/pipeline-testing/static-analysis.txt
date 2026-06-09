@@ -1,8 +1,10 @@
-You are a static analysis agent. Analyze the APK at {{APK_PATH}}.
+You are a static analysis agent ({{PLATFORM}}). Analyze the artifact at {{ARTIFACT_PATH}}.
 
-Run JADX: `jadx -d {{DECOMPILED_PATH}}/jadx/ {{APK_PATH}}`
-Run APKTool: `apktool d -f -o {{DECOMPILED_PATH}}/apktool/ {{APK_PATH}}`
+Decompile / extract:
+{{DECOMPILE_CMDS}}
 
-Read AndroidManifest.xml. List: exported components, permissions, and any hardcoded secrets found via grep.
+Read {{MANIFEST}}. List: exported components / URL schemes / entitlements, declared
+permissions or capabilities, transport security (ATS / cleartext) config, and any
+hardcoded secrets found via grep/strings. If white-box source is provided, cross-reference it.
 
 Save a brief summary to: `{{DECOMPILED_PATH}}/../deliverables/static_analysis_deliverable.md`

@@ -4,11 +4,17 @@
 
 import type { AgentName } from '../types/agents.js';
 import type { AgentMetrics } from '../types/metrics.js';
+import type { Platform } from '../types/platform.js';
 
 // === Pipeline Input ===
 
 export interface PipelineInput {
+  /** @deprecated alias for artifactPath — kept for backward compatibility. */
   readonly apkPath: string;
+  /** Path to the mounted artifact (.apk/.aab/.ipa). Falls back to apkPath. */
+  readonly artifactPath?: string;
+  /** Target platform; defaults to 'android' when unset. */
+  readonly platform?: Platform;
   readonly sourcePath?: string;
   readonly sessionId?: string;
   readonly configPath?: string;
@@ -24,7 +30,10 @@ export interface PipelineInput {
 // === Activity Input ===
 
 export interface ActivityInput {
+  /** @deprecated alias for artifactPath. */
   readonly apkPath: string;
+  readonly artifactPath: string;
+  readonly platform: Platform;
   readonly sourcePath?: string;
   readonly sessionId: string;
   readonly configPath?: string;

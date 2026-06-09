@@ -1,0 +1,68 @@
+### Common Frida Hooks for iOS Security Testing
+
+Requires a jailbroken device with frida-server (dynamic only — skip if static-only).
+Use these as starting points; enumerate with `ObjC.classes` / `ObjC.available` and adapt.
+
+#### Hook NSUserDefaults writes (detect plaintext storage of secrets)
+```javascript
+if (ObjC.available) {
+  const NSUserDefaults = ObjC.classes.NSUserDefaults;
+  Interceptor.attach(NSUserDefaults['- setObject:forKey:'].implementation, {
+    onEnter(args) {
+      const key = new ObjC.Object(args[3]).toString();
+      const val = new ObjC.Object(args[2]).toString();
+      console.log(`[NSUserDefaults] ${key} = ${val}`);
+    },
+  });
+}
+```
+
+#### Dump Keychain items (SecItemAdd / SecItemCopyMatching)
+```javascript
+['SecItemAdd', 'SecItemCopyMatching'].forEach((fn) => {
+  Interceptor.attach(Module.findExportByName('Security', fn), {
+    onEnter(args) { this.query = new ObjC.Object(args[0]); },
+    onLeave() { console.log(`[Keychain] ${fn}: ${this.query}`); },
+  });
+});
+```
+
+#### Bypass SSL certificate pinning (NSURLSession challenge handler)
+```javascript
+// Generic: force the completion handler to use the server trust as-is.
+const cls = ObjC.classes.NSURLSession;  // app-specific delegate may differ
+// Prefer a known module (e.g. SSL-Kill-Switch style) or hook
+// URLSession:didReceiveChallenge:completionHandler: in the app's delegate.
+```
+
+#### Bypass jailbreak detection (file existence + canOpenURL)
+```javascript
+const NSFileManager = ObjC.classes.NSFileManager;
+Interceptor.attach(NSFileManager['- fileExistsAtPath:'].implementation, {
+  onEnter(args) { this.p = new ObjC.Object(args[2]).toString(); },
+  onLeave(ret) {
+    if (/Cydia|\/bin\/bash|\/etc\/apt|MobileSubstrate|frida/i.test(this.p)) {
+      ret.replace(ptr(0x0));  // pretend the jailbreak artifact is absent
+    }
+  },
+});
+```
+
+#### Bypass anti-debug (ptrace PT_DENY_ATTACH)
+```javascript
+const ptrace = Module.findExportByName(null, 'ptrace');
+if (ptrace) Interceptor.replace(ptrace, new NativeCallback(() => 0, 'int', ['int','int','int','int']));
+```
+
+#### Silence sensitive logging (NSLog) for cleaner triage
+```javascript
+Interceptor.attach(Module.findExportByName(null, 'NSLog'), {
+  onEnter(args) { console.log('[NSLog] ' + new ObjC.Object(args[0]).toString()); },
+});
+```
+
+#### Enumerate classes / trace a method
+```javascript
+// List app classes:  Object.keys(ObjC.classes).filter(c => /AppName/.test(c))
+// Then attach to '- someSensitiveMethod:' implementations to trace inputs/outputs.
+```

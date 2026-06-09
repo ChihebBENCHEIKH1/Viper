@@ -16,11 +16,13 @@ import * as activities from './activities.js';
 
 async function main(): Promise<void> {
   // === Read Configuration from Environment ===
-  const apkPath = process.env['VIPER_APK_PATH'];
-  if (!apkPath) {
-    console.error('ERROR: VIPER_APK_PATH environment variable is required');
+  const artifactPath = process.env['VIPER_ARTIFACT_PATH'] ?? process.env['VIPER_APK_PATH'];
+  if (!artifactPath) {
+    console.error('ERROR: VIPER_ARTIFACT_PATH (or VIPER_APK_PATH) environment variable is required');
     process.exit(1);
   }
+  const platformEnv = process.env['VIPER_PLATFORM'];
+  const platform: 'android' | 'ios' = platformEnv === 'ios' ? 'ios' : 'android';
 
   const sourcePath = process.env['VIPER_SOURCE_PATH'];
   const configPath = process.env['VIPER_CONFIG_PATH'];
@@ -34,7 +36,8 @@ async function main(): Promise<void> {
   const taskQueue = `viper-${sessionId}`;
 
   console.log(`\n  Viper Worker — Session: ${sessionId}`);
-  console.log(`  APK: ${apkPath}`);
+  console.log(`  Platform: ${platform}`);
+  console.log(`  Artifact: ${artifactPath}`);
   console.log(`  Task Queue: ${taskQueue}`);
   console.log(`  Temporal: ${temporalAddress}\n`);
 
@@ -52,7 +55,9 @@ async function main(): Promise<void> {
   const client = new Client({ connection: clientConnection });
 
   const pipelineInput: PipelineInput = {
-    apkPath,
+    apkPath: artifactPath,
+    artifactPath,
+    platform,
     ...(sourcePath && { sourcePath }),
     sessionId,
     ...(configPath && { configPath }),

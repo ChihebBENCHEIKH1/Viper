@@ -39,7 +39,7 @@ a local attacker, backup-based attack, or cross-application data theft.
 ---
 
 ## Frida Hook Patterns
-@include(shared/_frida-patterns.txt)
+@include(shared/_{{PLATFORM}}-frida-patterns.txt)
 
 ---
 
