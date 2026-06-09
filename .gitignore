@@ -10,4 +10,4 @@ workspaces/
 
 # Scan outputs / run logs (local test artifacts)
 viper-out/
-viper-run*.log
+viper-*.log
